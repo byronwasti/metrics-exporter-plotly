@@ -1,0 +1,11 @@
+[package]
+name = "metrics-exporter-plotly"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+metrics = "0.23.0"
+plotly = "0.8.4"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time"] }
