@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 metrics = "0.23.0"
 plotly = "0.8.4"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
+tracing = "0.1.40"

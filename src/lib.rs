@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::sync::oneshot::{self, Receiver, Sender};
+use tracing::error;
 
 pub struct PlotlyRecorderBuilder {}
 
@@ -53,74 +55,106 @@ impl State {
 
 pub struct PlotlyRecorder {
     state: Arc<Mutex<State>>,
+    handle: Option<PlotlyRecorderHandle>,
 }
 
 impl PlotlyRecorder {
     fn new() -> Self {
         let state = Arc::new(Mutex::new(State::new()));
+        let (tx0, rx0) = oneshot::channel();
+        let (tx1, rx1) = oneshot::channel();
 
         let state2 = state.clone();
-        tokio::spawn(scraper(state2));
+        tokio::spawn(scraper(state2, (rx0, tx1)));
 
-        Self { state }
+        let handle = PlotlyRecorderHandle {
+            channel: (tx0, rx1),
+        };
+        Self {
+            state,
+            handle: Some(handle),
+        }
     }
 
     fn get_handle(&mut self) -> PlotlyRecorderHandle {
-        PlotlyRecorderHandle {}
+        self.handle.take().unwrap()
     }
 }
 
 impl Recorder for PlotlyRecorder {
-    fn describe_counter(&self, key: KeyName, unit: Option<Unit>, description: SharedString) {
-        unimplemented!()
+    fn describe_counter(&self, _key: KeyName, _unit: Option<Unit>, _description: SharedString) {
+        // TODO
     }
 
-    fn describe_gauge(&self, key: KeyName, unit: Option<Unit>, description: SharedString) {
-        unimplemented!()
+    fn describe_gauge(&self, _key: KeyName, _unit: Option<Unit>, _description: SharedString) {
+        // TODO
     }
 
-    fn describe_histogram(&self, key: KeyName, unit: Option<Unit>, description: SharedString) {
-        unimplemented!()
+    fn describe_histogram(&self, _key: KeyName, _unit: Option<Unit>, _description: SharedString) {
+        // TODO
     }
 
-    fn register_counter(&self, key: &Key, metadata: &Metadata<'_>) -> Counter {
+    fn register_counter(&self, key: &Key, _metadata: &Metadata<'_>) -> Counter {
         let atomic = self.state.lock().unwrap().get_counter(&key);
         Counter::from_arc(atomic)
     }
 
-    fn register_gauge(&self, key: &Key, metadata: &Metadata<'_>) -> Gauge {
+    fn register_gauge(&self, _key: &Key, _metadata: &Metadata<'_>) -> Gauge {
         unimplemented!()
     }
 
-    fn register_histogram(&self, key: &Key, metadata: &Metadata<'_>) -> Histogram {
+    fn register_histogram(&self, _key: &Key, _metadata: &Metadata<'_>) -> Histogram {
         unimplemented!()
     }
 }
 
-pub struct PlotlyRecorderHandle {}
-
-impl Drop for PlotlyRecorderHandle {
-    fn drop(&mut self) {
-        println!("Bye bye");
-    }
+pub struct PlotlyRecorderHandle {
+    channel: (Sender<()>, Receiver<DataCollector>),
 }
 
-async fn scraper(state: Arc<Mutex<State>>) {
-    let mut data = DataCollector::new();
+impl PlotlyRecorderHandle {
+    pub async fn plot(self) {
+        let _ = self.channel.0.send(());
+        let res = self.channel.1.await;
 
-    loop {
-        // TODO: Configurable scrape time
-        tokio::time::sleep(Duration::from_millis(1000));
-
-        let state = state.lock().unwrap();
-
-        for (key, counter) in state.counters.iter() {
-            let val = counter.load(Ordering::Relaxed);
-            data.push_counter(key, val);
+        if let Ok(data) = res {
+            println!("{data:?}");
+        } else {
+            error!("Channel broke in Drop impl.");
         }
     }
 }
 
+async fn scraper(state: Arc<Mutex<State>>, (rx, tx): (Receiver<()>, Sender<DataCollector>)) {
+    let mut data = DataCollector::new();
+    // TODO: Configurable scrape time
+    let scrape_interval = Duration::from_millis(1000);
+
+    tokio::select! {
+        _ = async {
+            loop {
+                tokio::time::sleep(scrape_interval).await;
+                scrape_data(&mut data, &state);
+            }
+        } => {
+        }
+        _ = rx => {
+            scrape_data(&mut data, &state);
+        }
+    }
+
+    let _ = tx.send(data);
+}
+
+fn scrape_data(data: &mut DataCollector, state: &Mutex<State>) {
+    let state = state.lock().unwrap();
+    for (key, counter) in state.counters.iter() {
+        let val = counter.load(Ordering::Relaxed);
+        data.push_counter(key, val);
+    }
+}
+
+#[derive(Debug)]
 struct DataCollector {
     counters: HashMap<Key, Vec<u64>>,
 }
