@@ -10,5 +10,6 @@ metrics = "0.23.0"
 metrics-util = "0.17.0"
 pdatastructs = "0.7.0"
 plotly = "0.8.4"
+regex = "1.10.5"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync", "macros"] }
 tracing = "0.1.40"

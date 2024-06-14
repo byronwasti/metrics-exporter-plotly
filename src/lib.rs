@@ -11,10 +11,21 @@ use std::time::{Duration, Instant};
 use tokio::sync::oneshot::{self, Receiver, Sender};
 use tracing::error;
 
+mod pattern;
+mod plot;
+
+pub use pattern::{PatternGroup, PlotKind};
+
 const TDIGEST_COMPRESSION_FACTOR: f64 = 100.0;
 const TDIGEST_MAX_BACKLOG_SIZE: usize = 10;
 
 pub struct PlotlyRecorderBuilder {}
+
+impl Default for PlotlyRecorderBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl PlotlyRecorderBuilder {
     pub fn new() -> Self {
@@ -78,17 +89,17 @@ impl Recorder for PlotlyRecorder {
     }
 
     fn register_counter(&self, key: &Key, _metadata: &Metadata<'_>) -> Counter {
-        let atomic = self.state.lock().unwrap().get_counter(&key);
+        let atomic = self.state.lock().unwrap().get_counter(key);
         Counter::from_arc(atomic)
     }
 
     fn register_gauge(&self, key: &Key, _metadata: &Metadata<'_>) -> Gauge {
-        let atomic = self.state.lock().unwrap().get_gauge(&key);
+        let atomic = self.state.lock().unwrap().get_gauge(key);
         Gauge::from_arc(atomic)
     }
 
     fn register_histogram(&self, key: &Key, _metadata: &Metadata<'_>) -> Histogram {
-        let atomic = self.state.lock().unwrap().get_histogram(&key);
+        let atomic = self.state.lock().unwrap().get_histogram(key);
         Histogram::from_arc(atomic)
     }
 }
@@ -109,7 +120,7 @@ impl State {
     }
 
     fn get_counter(&mut self, key: &Key) -> Arc<AtomicU64> {
-        if let Some(val) = self.counters.get(&key) {
+        if let Some(val) = self.counters.get(key) {
             val.clone()
         } else {
             let val = Arc::new(AtomicU64::new(0));
@@ -119,7 +130,7 @@ impl State {
     }
 
     fn get_gauge(&mut self, key: &Key) -> Arc<AtomicU64> {
-        if let Some(val) = self.gauges.get(&key) {
+        if let Some(val) = self.gauges.get(key) {
             val.clone()
         } else {
             let val = Arc::new(AtomicU64::new(0));
@@ -129,7 +140,7 @@ impl State {
     }
 
     fn get_histogram(&mut self, key: &Key) -> Arc<AtomicBucket<f64>> {
-        if let Some(val) = self.histograms.get(&key) {
+        if let Some(val) = self.histograms.get(key) {
             val.clone()
         } else {
             let val = Arc::new(AtomicBucket::new());
@@ -144,12 +155,12 @@ pub struct PlotlyRecorderHandle {
 }
 
 impl PlotlyRecorderHandle {
-    pub async fn plot(self) {
+    pub async fn plot(self, groups: &[PatternGroup]) {
         let _ = self.channel.0.send(());
         let res = self.channel.1.await;
 
         if let Ok(data) = res {
-            plot_data(data);
+            plot::plot_data(data, groups);
         } else {
             error!("Channel broke in Drop impl.");
         }
@@ -257,24 +268,32 @@ impl DataCollector {
             self.histograms.insert(key.to_owned(), vec![value]);
         }
     }
-}
 
-fn plot_data(mut data: DataCollector) {
-    use plotly::common::Mode;
-    use plotly::{Plot, Scatter};
-    println!("{data:?}");
-
-    let mut plot = Plot::new();
-
-    for (key, y) in data.counters.drain() {
-        let mut x = data.timestamps.clone();
-        let x = x.split_off(x.len() - y.len());
-
-        println!("xs: {x:?}, ys: {y:?}");
-
-        let trace = Scatter::new(x, y).name(key.name()).mode(Mode::Lines);
-        plot.add_trace(trace);
+    fn metrics(&self) -> Vec<&str> {
+        self.counters
+            .keys()
+            .chain(self.gauges.keys())
+            .chain(self.histograms.keys())
+            .map(|key| key.name())
+            .collect()
     }
 
-    plot.show();
+    fn get_metric(&self, name: &str) -> Option<MetricKind> {
+        let key = Key::from_name(name.to_owned());
+
+        if let Some(vals) = self.counters.get(&key) {
+            Some(MetricKind::Single(vals.clone()))
+        } else if let Some(vals) = self.gauges.get(&key) {
+            Some(MetricKind::Single(vals.clone()))
+        } else {
+            self.histograms
+                .get(&key)
+                .map(|vals| MetricKind::Quantile(vals.clone()))
+        }
+    }
+}
+
+pub(crate) enum MetricKind {
+    Single(Vec<u64>),
+    Quantile(Vec<(f64, f64, f64, f64)>),
 }
