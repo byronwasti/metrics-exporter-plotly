@@ -32,17 +32,33 @@ impl PlotlyRecorderBuilder {
         Self {}
     }
 
+    /// Install the recorder globally.
     pub fn install(self) -> Result<PlotlyRecorderHandle, SetRecorderError<PlotlyRecorder>> {
-        std::thread::spawn(|| {});
+        use tokio::runtime;
+        let mut recorder = if let Ok(handle) = runtime::Handle::try_current() {
+            let _g = handle.enter();
+            self.build()
+        } else {
+            let runtime = runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
 
-        let mut recorder = self.build();
+            let recorder = {
+                let _g = runtime.enter();
+                self.build()
+            };
+
+            recorder
+        };
+
         let handle = recorder.get_handle();
         metrics::set_global_recorder(recorder)?;
-
         Ok(handle)
     }
 
-    fn build(&self) -> PlotlyRecorder {
+    /// No intended for normal use, only for manually installing the recorder.
+    pub fn build(&self) -> PlotlyRecorder {
         PlotlyRecorder::new()
     }
 }
@@ -155,8 +171,12 @@ pub struct PlotlyRecorderHandle {
 }
 
 impl PlotlyRecorderHandle {
+    /// Plot the metrics
+    ///
+    /// Consumes the handle and metrics data for a one-shot plotting of the metrics. Takes a slice
+    /// of `PatternGroup`s which will each be opened in a new browser window.
     pub async fn plot(self, groups: &[PatternGroup]) {
-        let _ = self.channel.0.send(());
+        self.channel.0.send(()).unwrap();
         let res = self.channel.1.await;
 
         if let Ok(data) = res {

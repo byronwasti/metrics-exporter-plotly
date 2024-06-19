@@ -5,14 +5,18 @@ use metrics_exporter_plotly::{PatternGroup, PlotKind, PlotlyRecorderBuilder};
 async fn main() {
     let handle = PlotlyRecorderBuilder::new().install().unwrap();
 
-    for _ in 0..200 {
-        counter!("something_success").increment(1);
-        counter!("something_error").increment(1);
+    let h = tokio::spawn(async {
+        for _ in 0..200 {
+            counter!("something_success").increment(1);
+            counter!("something_error").increment(1);
 
-        counter!("foo_success").increment(2);
-        counter!("foo_error").increment(2);
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
+            counter!("foo_asdf_success").increment(2);
+            counter!("foo_asdf_error").increment(2);
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    });
+
+    h.await;
 
     handle
         .plot(&[PatternGroup::new()

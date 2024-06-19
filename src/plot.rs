@@ -4,7 +4,7 @@ use plotly::common::Mode;
 use plotly::layout::{GridPattern, Layout, LayoutGrid};
 use plotly::{Plot, Scatter};
 
-pub fn plot_data(data: DataCollector, groups: &[PatternGroup]) {
+pub(crate) fn plot_data(data: DataCollector, groups: &[PatternGroup]) {
     let metrics = data.metrics();
 
     for group in groups {

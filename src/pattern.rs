@@ -1,6 +1,7 @@
 use regex::Regex;
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct PatternGroup {
     patterns: Vec<(Regex, PlotKind)>,
 }
@@ -16,6 +17,25 @@ impl PatternGroup {
         Self { patterns: vec![] }
     }
 
+    /// Add a pattern to match for plotting
+    ///
+    /// Takes in a regex pattern with a named capture group which will be used to correlate
+    /// metrics.
+    ///
+    /// # Example
+    ///
+    /// The following will match metrics of the form `*_success` and `*_error`, and group them
+    /// together into plots next to each other.
+    ///
+    /// ```rust,no_run
+    /// PatternGroup::new()
+    ///     .pattern(r"(?<transaction>.*)_success", PlotKind::Rate)
+    ///     .pattern(r"(?<transaction>.*)_error", PlotKind::Rate)
+    /// ```
+    ///
+    /// For instance, `foo_success` and `foo_error` will be grouped, and `bar_success` and
+    /// `bar_error` will be grouped together.
+    ///
     /// # Panics
     /// Panics on an invalid Regex
     pub fn pattern(mut self, regex: &str, kind: PlotKind) -> Self {
@@ -89,14 +109,5 @@ mod tests {
             ("bar_success".to_string(), PlotKind::Rate),
             ("bar_error".to_string(), PlotKind::Line)
         ]));
-    }
-
-    #[test]
-    fn test_pattern() {
-        let re = Regex::new(r"(?<scenario>.*)_success_(?<transaction>.*)").unwrap();
-
-        let cap = re.captures("foo_success_");
-
-        println!("{cap:?}");
     }
 }
