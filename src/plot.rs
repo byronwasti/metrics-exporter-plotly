@@ -53,28 +53,28 @@ pub(crate) fn plot_data(data: DataCollector, groups: &[PatternGroup]) {
                         }
 
                         let trace = Scatter::new(x.clone(), unzipped.pop().unwrap())
-                            .name(name.clone())
+                            .name(format!("{name}_p50"))
                             .x_axis(format!("x{idx}"))
                             .y_axis(format!("y{idx}"))
                             .mode(Mode::Lines);
                         plot.add_trace(trace);
 
                         let trace = Scatter::new(x.clone(), unzipped.pop().unwrap())
-                            .name(name.clone())
+                            .name(format!("{name}_p90"))
                             .x_axis(format!("x{idx}"))
                             .y_axis(format!("y{idx}"))
                             .mode(Mode::Lines);
                         plot.add_trace(trace);
 
                         let trace = Scatter::new(x.clone(), unzipped.pop().unwrap())
-                            .name(name.clone())
+                            .name(format!("{name}_p95"))
                             .x_axis(format!("x{idx}"))
                             .y_axis(format!("y{idx}"))
                             .mode(Mode::Lines);
                         plot.add_trace(trace);
 
                         let trace = Scatter::new(x, unzipped.pop().unwrap())
-                            .name(name.clone())
+                            .name(format!("{name}_p99"))
                             .x_axis(format!("x{idx}"))
                             .y_axis(format!("y{idx}"))
                             .mode(Mode::Lines);

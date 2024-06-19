@@ -1,6 +1,6 @@
 [package]
 name = "metrics-exporter-plotly"
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT"
 authors = ["Byron Wasti <github@byronwasti.com>"]
 homepage = "https://github.com/byronwasti/metrics-exporter-plotly"
