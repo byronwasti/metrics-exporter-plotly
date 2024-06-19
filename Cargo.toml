@@ -1,7 +1,16 @@
 [package]
 name = "metrics-exporter-plotly"
 version = "0.1.0"
+license = "MIT"
+authors = ["Byron Wasti <github@byronwasti.com>"]
+homepage = "https://github.com/byronwasti/metrics-exporter-plotly"
+repository = "https://github.com/byronwasti/metrics-exporter-plotly"
+description = "An embedded metrics-rs exporter for plotting with plotly"
+readme = "README.md"
+keywords = ["metrics"]
+categories = ["development-tools"]
 edition = "2021"
+publish = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
